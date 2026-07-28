@@ -258,8 +258,8 @@ export default function InscripcionPage() {
             {asistencia === "acompanado" && estadoCivil && (
               <p className="mt-4 rounded-lg bg-brand-50 px-4 py-3 text-sm text-brand-700">
                 {estadoCivil === "soltero_con_hijos" && "Solo puede asistir con sus hijos como acompañantes."}
-                {estadoCivil === "soltero_sin_hijos" && "Puedes registrar a tus acompañantes."}
-                {estadoCivil === "otro" && "Por favor indique su parentesco para registrar a sus acompañantes."}
+                {estadoCivil === "soltero_sin_hijos" && "Puedes registrar a 1 acompañante."}
+                {estadoCivil === "otro" && "Por favor indique el parentesco para registrar a sus acompañantes."}
               </p>
             )}
           </section>
