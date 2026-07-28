@@ -91,10 +91,10 @@ export default function InscripcionPage() {
         acompanantes:
           asistencia === "acompanado"
             ? acompanantes.map((a) => ({
-                nombre_completo: a.nombre.trim(),
-                edad: Number(a.edad),
-                genero: Number(a.edad) <= 14 ? a.genero : null,
-              }))
+              nombre_completo: a.nombre.trim(),
+              edad: Number(a.edad),
+              genero: Number(a.edad) <= 14 ? a.genero : null,
+            }))
             : [],
       };
       const res = await fetch("/api/inscripciones", {
@@ -171,7 +171,7 @@ export default function InscripcionPage() {
                   onChange={(e) => setCedula(e.target.value.replace(/[^0-9]/g, ""))}
                   inputMode="numeric"
                   className={inputCls}
-                  placeholder="Solo números"
+                  placeholder="Ingreselo sin puntos ni comas"
                 />
               </Field>
 
@@ -199,7 +199,6 @@ export default function InscripcionPage() {
                 <input
                   readOnly
                   value={antiguedad === null ? "" : `${antiguedad} meses`}
-                  placeholder="Se calcula automáticamente"
                   className={`${inputCls} cursor-default bg-slate-50 text-slate-600`}
                 />
               </Field>
@@ -341,11 +340,10 @@ function RadioCard({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-xl border p-4 text-left transition ${
-        active
-          ? "border-brand-500 bg-brand-50 ring-2 ring-brand-100"
-          : "border-slate-200 bg-white hover:border-slate-300"
-      }`}
+      className={`rounded-xl border p-4 text-left transition ${active
+        ? "border-brand-500 bg-brand-50 ring-2 ring-brand-100"
+        : "border-slate-200 bg-white hover:border-slate-300"
+        }`}
     >
       <div className="text-sm font-semibold text-slate-900">{title}</div>
       <div className="mt-0.5 text-xs text-slate-500">{desc}</div>
