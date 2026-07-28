@@ -3,7 +3,10 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { calcularAntiguedadMeses } from "@/lib/utils";
 import { verificarSesion, AUTH_COOKIE } from "@/lib/auth";
 import type { InscripcionInput } from "@/lib/types";
+import { SEDES, PARENTESCOS } from "@/lib/constants";
 import { cookies } from "next/headers";
+
+const ESTADOS = ["soltero_con_hijos", "soltero_sin_hijos", "otro"] as const;
 
 // ---------- Validación en servidor ----------
 function validar(body: any): { ok: true; data: InscripcionInput } | { ok: false; error: string } {
@@ -11,12 +14,16 @@ function validar(body: any): { ok: true; data: InscripcionInput } | { ok: false;
 
   const nombre = String(body.nombre_completo ?? "").trim();
   const cedula = String(body.cedula ?? "").trim();
+  const sede = String(body.sede ?? "").trim();
+  const estadoCivil = body.estado_civil;
   const mes = Number(body.ingreso_mes);
   const anio = Number(body.ingreso_anio);
   const asistencia = body.asistencia;
 
   if (!nombre) return { ok: false, error: "El nombre del colaborador es obligatorio." };
   if (!cedula) return { ok: false, error: "La cédula es obligatoria." };
+  if (!sede || !SEDES.includes(sede as any)) return { ok: false, error: "Seleccione una sede válida." };
+  if (!ESTADOS.includes(estadoCivil)) return { ok: false, error: "Seleccione el estado civil." };
   if (!(mes >= 1 && mes <= 12)) return { ok: false, error: "Mes de ingreso inválido." };
   if (!(anio >= 1980 && anio <= 2100)) return { ok: false, error: "Año de ingreso inválido." };
   if (asistencia !== "solo" && asistencia !== "acompanado")
@@ -24,42 +31,64 @@ function validar(body: any): { ok: true; data: InscripcionInput } | { ok: false;
 
   let acompanantes: any[] = Array.isArray(body.acompanantes) ? body.acompanantes : [];
   if (asistencia === "solo") acompanantes = [];
-  if (acompanantes.length > 7)
-    return { ok: false, error: "Máximo 7 acompañantes permitidos." };
-  if (asistencia === "acompanado" && acompanantes.length === 0)
-    return { ok: false, error: "Debe registrar al menos un acompañante." };
 
-  for (const a of acompanantes) {
-    const n = String(a?.nombre_completo ?? "").trim();
-    const edad = Number(a?.edad);
-    if (!n) return { ok: false, error: "Todos los acompañantes deben tener nombre." };
-    if (!Number.isFinite(edad) || edad < 0)
-      return { ok: false, error: "La edad no puede ser negativa." };
-    if (edad > 120) return { ok: false, error: "La edad no puede superar 120 años." };
-    if (edad <= 14 && a?.genero !== "masculino" && a?.genero !== "femenino")
-      return { ok: false, error: "Indique el género de los menores de 14 años." };
+  if (asistencia === "acompanado") {
+    if (acompanantes.length === 0)
+      return { ok: false, error: "Debe registrar al menos un acompañante." };
+    if (estadoCivil === "soltero_sin_hijos" && acompanantes.length !== 1)
+      return { ok: false, error: "Solo puedes registrar 1 acompañante" };
   }
+
+  const conCategoria = (a: any): string => {
+    if (estadoCivil === "soltero_con_hijos") return "Hijo(a)";
+    if (estadoCivil === "soltero_sin_hijos") return "Acompañante";
+    return String(a?.categoria ?? "").trim(); // otro
+  };
+
+  const salida: InscripcionInput["acompanantes"] = [];
+  acompanantes.forEach((a, i) => {
+    const edad = Number(a?.edad);
+    if (!Number.isFinite(edad) || edad < 0) throw new ValidacionError("La edad no puede ser negativa.");
+    if (edad > 120) throw new ValidacionError("La edad no puede superar 120 años.");
+    if (edad <= 14 && a?.genero !== "masculino" && a?.genero !== "femenino")
+      throw new ValidacionError("Indique el género de los menores de 14 años.");
+    const categoria = conCategoria(a);
+    if (estadoCivil === "otro" && !PARENTESCOS.includes(categoria as any))
+      throw new ValidacionError("Seleccione el parentesco de cada acompañante.");
+    salida.push({
+      nombre_completo: `Acompañante ${i + 1}`,
+      categoria,
+      edad,
+      genero: edad <= 14 ? (a.genero as any) : null,
+    });
+  });
 
   return {
     ok: true,
     data: {
       nombre_completo: nombre,
       cedula,
+      sede,
+      estado_civil: estadoCivil,
       ingreso_mes: mes,
       ingreso_anio: anio,
       asistencia,
-      acompanantes: acompanantes.map((a) => ({
-        nombre_completo: String(a.nombre_completo).trim(),
-        edad: Number(a.edad),
-        genero: Number(a.edad) <= 14 ? (a.genero as any) : null,
-      })),
+      acompanantes: salida,
     },
   };
 }
 
+class ValidacionError extends Error { }
+
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
-  const parsed = validar(body);
+  let parsed;
+  try {
+    parsed = validar(body);
+  } catch (e) {
+    if (e instanceof ValidacionError) return NextResponse.json({ error: e.message }, { status: 400 });
+    return NextResponse.json({ error: "Datos inválidos." }, { status: 400 });
+  }
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
 
   const supabase = getSupabaseAdmin();
@@ -72,6 +101,8 @@ export async function POST(req: Request) {
     .insert({
       nombre_completo: data.nombre_completo,
       cedula: data.cedula,
+      sede: data.sede,
+      estado_civil: data.estado_civil,
       ingreso_mes: data.ingreso_mes,
       ingreso_anio: data.ingreso_anio,
       antiguedad_meses: antiguedad,
@@ -81,7 +112,6 @@ export async function POST(req: Request) {
     .single();
 
   if (colabErr) {
-    // 23505 = unique_violation (cédula repetida)
     if ((colabErr as any).code === "23505") {
       return NextResponse.json(
         { error: "Ya existe una inscripción con esta cédula." },
@@ -96,12 +126,12 @@ export async function POST(req: Request) {
     const rows = data.acompanantes.map((a) => ({
       colaborador_id: colab.id,
       nombre_completo: a.nombre_completo,
+      categoria: a.categoria ?? null,
       edad: a.edad,
       genero: a.genero ?? null,
     }));
     const { error: accErr } = await supabase.from("acompanantes").insert(rows);
     if (accErr) {
-      // rollback manual del colaborador
       await supabase.from("colaboradores").delete().eq("id", colab.id);
       return NextResponse.json({ error: "No se pudieron guardar los acompañantes." }, { status: 500 });
     }

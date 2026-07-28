@@ -3,7 +3,7 @@ import Link from "next/link";
 const INSTRUCCIONES = [
   "Complete toda la información solicitada.",
   "Verifique que los datos sean correctos.",
-  "Puede registrar hasta siete acompañantes.",
+  "El número de acompañantes depende de su estado civil.",
   "Una vez enviado el formulario no podrá modificar la información.",
 ];
 

@@ -3,82 +3,102 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { calcularAntiguedadMeses, MESES } from "@/lib/utils";
+import { SEDES, ESTADOS_CIVILES, PARENTESCOS, type EstadoCivil } from "@/lib/constants";
+import { alertaAdvertencia, alertaError, alertaExito } from "@/lib/alerts";
+import { Spinner } from "@/components/Spinner";
 
 type Genero = "masculino" | "femenino" | "";
 interface Acomp {
   id: number;
+  categoria: string;
   edad: string;
   genero: Genero;
 }
 
-const MAX_ACOMP = 7;
 const ANIO_ACTUAL = new Date().getFullYear();
 const ANIOS = Array.from({ length: ANIO_ACTUAL - 1990 + 1 }, (_, i) => ANIO_ACTUAL - i);
 
 let acompId = 1;
+const nuevoAcomp = (): Acomp => ({ id: acompId++, categoria: "", edad: "", genero: "" });
 
 export default function InscripcionPage() {
   const [nombre, setNombre] = useState("");
   const [cedula, setCedula] = useState("");
+  const [sede, setSede] = useState("");
+  const [estadoCivil, setEstadoCivil] = useState<EstadoCivil | "">("");
   const [mes, setMes] = useState("");
   const [anio, setAnio] = useState("");
   const [asistencia, setAsistencia] = useState<"" | "solo" | "acompanado">("");
-  const [cantidad, setCantidad] = useState("");
   const [acompanantes, setAcompanantes] = useState<Acomp[]>([]);
-  const [error, setError] = useState("");
   const [enviando, setEnviando] = useState(false);
-  const [exito, setExito] = useState(false);
 
   const antiguedad = useMemo(() => {
     if (!mes || !anio) return null;
     return calcularAntiguedadMeses(Number(mes), Number(anio));
   }, [mes, anio]);
 
+  const soloUno = estadoCivil === "soltero_sin_hijos"; // límite exacto de 1
+  const pideParentesco = estadoCivil === "otro";
+
   function reset() {
-    setNombre(""); setCedula(""); setMes(""); setAnio("");
-    setAsistencia(""); setCantidad(""); setAcompanantes([]); setError("");
+    setNombre(""); setCedula(""); setSede(""); setEstadoCivil("");
+    setMes(""); setAnio(""); setAsistencia(""); setAcompanantes([]);
   }
 
   function actualizar(id: number, campo: keyof Acomp, valor: string) {
     setAcompanantes((a) => a.map((x) => (x.id === id ? { ...x, [campo]: valor } : x)));
   }
 
-  // Ajusta el número de tarjetas según la cantidad elegida (conserva lo ya escrito)
-  function elegirCantidad(valor: string) {
-    setCantidad(valor);
-    const n = Number(valor);
+  // Ajusta las tarjetas según asistencia + estado civil
+  function ajustar(asis: "" | "solo" | "acompanado", estado: EstadoCivil | "") {
+    if (asis !== "acompanado" || estado === "") {
+      setAcompanantes([]);
+      return;
+    }
     setAcompanantes((prev) => {
-      const next: Acomp[] = [];
-      for (let i = 0; i < n; i++) {
-        next.push(prev[i] ?? { id: acompId++, edad: "", genero: "" });
+      if (estado === "soltero_sin_hijos") {
+        return prev.length >= 1 ? [prev[0]] : [nuevoAcomp()];
       }
-      return next;
+      return prev.length >= 1 ? prev : [nuevoAcomp()];
     });
   }
 
   function seleccionarAsistencia(v: "solo" | "acompanado") {
     setAsistencia(v);
-    if (v === "solo") {
-      setCantidad("");
-      setAcompanantes([]);
-    }
+    ajustar(v, estadoCivil);
+  }
+
+  function cambiarEstadoCivil(v: string) {
+    const e = v as EstadoCivil | "";
+    setEstadoCivil(e);
+    ajustar(asistencia, e);
+  }
+
+  function agregarAcompanante() {
+    setAcompanantes((a) => [...a, nuevoAcomp()]);
+  }
+  function eliminarAcompanante(id: number) {
+    setAcompanantes((a) => a.filter((x) => x.id !== id));
   }
 
   function validarCliente(): string | null {
     if (!nombre.trim()) return "Ingrese el nombre completo del colaborador.";
     if (!cedula.trim()) return "Ingrese el número de cédula.";
+    if (!sede) return "Seleccione la sede a la que pertenece.";
+    if (!estadoCivil) return "Seleccione el estado civil.";
     if (!mes || !anio) return "Seleccione el mes y año de ingreso.";
     if (!asistencia) return "Indique si asistirá solo o acompañado.";
     if (asistencia === "acompanado") {
-      if (!cantidad) return "Indique cuántos acompañantes registrará.";
-      if (acompanantes.length < 1 || acompanantes.length > MAX_ACOMP)
-        return `La cantidad de acompañantes debe estar entre 1 y ${MAX_ACOMP}.`;
+      if (acompanantes.length === 0) return "Agregue al menos un acompañante.";
+      if (soloUno && acompanantes.length !== 1)
+        return "Si es soltero sin hijos solo puede registrar 1 acompañante.";
       for (const a of acompanantes) {
         const e = Number(a.edad);
         if (a.edad === "" || Number.isNaN(e)) return "Ingrese la edad de cada acompañante.";
         if (e < 0) return "La edad no puede ser negativa.";
         if (e > 120) return "La edad no puede superar 120 años.";
         if (e <= 14 && !a.genero) return "Seleccione el género de los menores de 14 años.";
+        if (pideParentesco && !a.categoria) return "Seleccione el parentesco de cada acompañante.";
       }
     }
     return null;
@@ -86,22 +106,23 @@ export default function InscripcionPage() {
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
-    setError("");
     const v = validarCliente();
-    if (v) { setError(v); return; }
+    if (v) { alertaAdvertencia(v); return; }
 
     setEnviando(true);
     try {
       const payload = {
         nombre_completo: nombre.trim(),
         cedula: cedula.trim(),
+        sede,
+        estado_civil: estadoCivil,
         ingreso_mes: Number(mes),
         ingreso_anio: Number(anio),
         asistencia,
         acompanantes:
           asistencia === "acompanado"
-            ? acompanantes.map((a, idx) => ({
-              nombre_completo: `Acompañante ${idx + 1}`,
+            ? acompanantes.map((a) => ({
+              categoria: pideParentesco ? a.categoria : "",
               edad: Number(a.edad),
               genero: Number(a.edad) <= 14 ? a.genero : null,
             }))
@@ -113,42 +134,14 @@ export default function InscripcionPage() {
         body: JSON.stringify(payload),
       });
       const json = await res.json();
-      if (!res.ok) { setError(json.error || "No se pudo enviar la inscripción."); return; }
-      setExito(true);
+      if (!res.ok) { alertaError(json.error || "No se pudo enviar la inscripción."); return; }
       reset();
+      alertaExito("Tu inscripción al Día de la Familia CineProx fue registrada correctamente.");
     } catch {
-      setError("Error de conexión. Intente nuevamente.");
+      alertaError("Error de conexión. Intenta nuevamente.");
     } finally {
       setEnviando(false);
     }
-  }
-
-  if (exito) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-slate-100 px-6">
-        <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-          <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-green-100 text-3xl text-green-600">
-            ✓
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900">¡Inscripción registrada!</h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Gracias por registrarte al Día de la Familia CineProx. Tu información fue guardada
-            correctamente.
-          </p>
-          <div className="mt-6 flex flex-col gap-2">
-            <button
-              onClick={() => setExito(false)}
-              className="rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
-            >
-              Registrar otra inscripción
-            </button>
-            <Link href="/" className="text-sm font-medium text-slate-500 hover:text-slate-800">
-              Volver al inicio
-            </Link>
-          </div>
-        </div>
-      </main>
-    );
   }
 
   return (
@@ -183,6 +176,28 @@ export default function InscripcionPage() {
                   className={inputCls}
                   placeholder="Ingreselo sin puntos ni comas"
                 />
+              </Field>
+
+              <Field label="Sede a la que pertenece">
+                <select value={sede} onChange={(e) => setSede(e.target.value)} className={inputCls}>
+                  <option value="">Seleccione su sede</option>
+                  {SEDES.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field label="Estado civil">
+                <select
+                  value={estadoCivil}
+                  onChange={(e) => cambiarEstadoCivil(e.target.value)}
+                  className={inputCls}
+                >
+                  <option value="">Seleccione</option>
+                  {ESTADOS_CIVILES.map((e) => (
+                    <option key={e.value} value={e.value}>{e.label}</option>
+                  ))}
+                </select>
               </Field>
 
               <div>
@@ -234,30 +249,28 @@ export default function InscripcionPage() {
               />
             </div>
 
-            {/* Cantidad de acompañantes */}
-            {asistencia === "acompanado" && (
-              <div className="mt-5">
-                <Field label={`¿Cuántos acompañantes? (máximo ${MAX_ACOMP})`}>
-                  <select
-                    value={cantidad}
-                    onChange={(e) => elegirCantidad(e.target.value)}
-                    className={inputCls}
-                  >
-                    <option value="">Seleccione</option>
-                    {Array.from({ length: MAX_ACOMP }, (_, i) => i + 1).map((n) => (
-                      <option key={n} value={n}>{n}</option>
-                    ))}
-                  </select>
-                </Field>
-              </div>
+            {asistencia === "acompanado" && !estadoCivil && (
+              <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                Seleccione primero su estado civil para registrar acompañantes.
+              </p>
+            )}
+
+            {asistencia === "acompanado" && estadoCivil && (
+              <p className="mt-4 rounded-lg bg-brand-50 px-4 py-3 text-sm text-brand-700">
+                {estadoCivil === "soltero_con_hijos" && "Solo puede asistir con sus hijos como acompañantes."}
+                {estadoCivil === "soltero_sin_hijos" && "Puedes registrar a tus acompañantes."}
+                {estadoCivil === "otro" && "Por favor indique su parentesco para registrar a sus acompañantes."}
+              </p>
             )}
           </section>
 
           {/* Acompañantes */}
-          {asistencia === "acompanado" && acompanantes.length > 0 && (
+          {asistencia === "acompanado" && estadoCivil && acompanantes.length > 0 && (
             <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
               <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-slate-900">Datos de los acompañantes</h2>
+                <h2 className="text-lg font-semibold text-slate-900">
+                  {estadoCivil === "soltero_con_hijos" ? "Hijos" : "Acompañantes"}
+                </h2>
                 <span className="text-xs font-medium text-slate-500">{acompanantes.length} en total</span>
               </div>
 
@@ -265,14 +278,37 @@ export default function InscripcionPage() {
                 {acompanantes.map((a, idx) => {
                   const edadNum = Number(a.edad);
                   const esMenor = a.edad !== "" && !Number.isNaN(edadNum) && edadNum <= 14;
+                  const titulo =
+                    estadoCivil === "soltero_con_hijos" ? `Hijo(a) ${idx + 1}` : `Acompañante ${idx + 1}`;
                   return (
                     <div key={a.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="mb-3">
-                        <span className="text-sm font-semibold text-slate-700">
-                          Acompañante {idx + 1}
-                        </span>
+                      <div className="mb-3 flex items-center justify-between">
+                        <span className="text-sm font-semibold text-slate-700">{titulo}</span>
+                        {!soloUno && acompanantes.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => eliminarAcompanante(a.id)}
+                            className="text-xs font-medium text-red-500 hover:text-red-700"
+                          >
+                            Eliminar
+                          </button>
+                        )}
                       </div>
                       <div className="grid gap-3 sm:grid-cols-2">
+                        {pideParentesco && (
+                          <Field label="Parentesco">
+                            <select
+                              value={a.categoria}
+                              onChange={(e) => actualizar(a.id, "categoria", e.target.value)}
+                              className={inputCls}
+                            >
+                              <option value="">Seleccione</option>
+                              {PARENTESCOS.map((p) => (
+                                <option key={p} value={p}>{p}</option>
+                              ))}
+                            </select>
+                          </Field>
+                        )}
                         <Field label="Edad">
                           <input
                             value={a.edad}
@@ -302,20 +338,25 @@ export default function InscripcionPage() {
                   );
                 })}
               </div>
-            </section>
-          )}
 
-          {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-              {error}
-            </div>
+              {!soloUno && (
+                <button
+                  type="button"
+                  onClick={agregarAcompanante}
+                  className="mt-4 w-full rounded-lg border-2 border-dashed border-slate-300 py-3 text-sm font-medium text-slate-600 transition hover:border-brand-400 hover:text-brand-700"
+                >
+                  {estadoCivil === "soltero_con_hijos" ? "+ Agregar hijo(a)" : "+ Agregar acompañante"}
+                </button>
+              )}
+            </section>
           )}
 
           <button
             type="submit"
             disabled={enviando}
-            className="w-full rounded-xl bg-brand-600 px-6 py-4 text-base font-semibold text-white shadow-lg shadow-brand-600/20 transition hover:bg-brand-700 disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-6 py-4 text-base font-semibold text-white shadow-lg shadow-brand-600/20 transition hover:bg-brand-700 disabled:opacity-70"
           >
+            {enviando && <Spinner className="h-5 w-5" />}
             {enviando ? "Enviando…" : "Enviar inscripción"}
           </button>
         </form>

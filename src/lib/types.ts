@@ -1,8 +1,11 @@
+import type { EstadoCivil } from "./constants";
+
 export type Genero = "masculino" | "femenino";
 export type Asistencia = "solo" | "acompanado";
 
 export interface AcompananteInput {
   nombre_completo: string;
+  categoria?: string | null;
   edad: number;
   genero?: Genero | null;
 }
@@ -10,6 +13,8 @@ export interface AcompananteInput {
 export interface InscripcionInput {
   nombre_completo: string;
   cedula: string;
+  sede: string;
+  estado_civil: EstadoCivil;
   ingreso_mes: number;
   ingreso_anio: number;
   asistencia: Asistencia;
@@ -25,6 +30,8 @@ export interface Colaborador {
   id: string;
   nombre_completo: string;
   cedula: string;
+  sede: string | null;
+  estado_civil: EstadoCivil | null;
   ingreso_mes: number;
   ingreso_anio: number;
   antiguedad_meses: number;

@@ -10,6 +10,9 @@ import type { Colaborador } from "@/lib/types";
 import { calcularStats } from "@/lib/stats";
 import { exportarExcel } from "@/lib/exportExcel";
 import { formatearFecha, nombreMes } from "@/lib/utils";
+import { labelEstadoCivil } from "@/lib/constants";
+import { confirmarEliminar, alertaError, toastExito } from "@/lib/alerts";
+import { Spinner } from "@/components/Spinner";
 
 type SortKey = "nombre_completo" | "cedula" | "antiguedad_meses" | "acompanantes" | "created_at";
 const PAGE_SIZE = 8;
@@ -94,10 +97,40 @@ export default function DashboardPage() {
     router.refresh();
   }
 
+  async function eliminarColaborador(id: string) {
+    const ok = await confirmarEliminar(
+      "¿Eliminar colaborador?",
+      "Se eliminará el registro completo junto con todos sus acompañantes. Esta acción no se puede deshacer."
+    );
+    if (!ok) return;
+    const res = await fetch(`/api/inscripciones/${id}`, { method: "DELETE" });
+    if (!res.ok) { alertaError("No se pudo eliminar el colaborador."); return; }
+    setData((d) => d.filter((c) => c.id !== id));
+    setDetalle(null);
+    toastExito("Colaborador eliminado");
+  }
+
+  async function eliminarAcompanante(colaboradorId: string, acompananteId: string) {
+    const ok = await confirmarEliminar("¿Eliminar acompañante?", "Esta acción no se puede deshacer.");
+    if (!ok) return;
+    const res = await fetch(`/api/acompanantes/${acompananteId}`, { method: "DELETE" });
+    if (!res.ok) { alertaError("No se pudo eliminar el acompañante."); return; }
+    const quitar = (c: Colaborador): Colaborador =>
+      c.id === colaboradorId
+        ? { ...c, acompanantes: (c.acompanantes ?? []).filter((a) => a.id !== acompananteId) }
+        : c;
+    setData((d) => d.map(quitar));
+    setDetalle((prev) => (prev ? quitar(prev) : prev));
+    toastExito("Acompañante eliminado");
+  }
+
   if (loading) {
     return (
-      <main className="grid min-h-screen place-items-center bg-slate-100 text-sm text-slate-500">
-        Cargando panel…
+      <main className="grid min-h-screen place-items-center bg-slate-100">
+        <div className="flex flex-col items-center gap-3 text-sm text-slate-500">
+          <Spinner className="h-8 w-8 text-brand-600" />
+          Cargando panel…
+        </div>
       </main>
     );
   }
@@ -208,11 +241,12 @@ export default function DashboardPage() {
           </div>
 
           <div className="thin-scroll overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm">
+            <table className="w-full min-w-[860px] text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <Th label="Empleado" k="nombre_completo" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                   <Th label="Cédula" k="cedula" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                  <th className="px-4 py-3 font-semibold">Sede</th>
                   <th className="px-4 py-3 font-semibold">Fecha ingreso</th>
                   <Th label="Antigüedad" k="antiguedad_meses" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                   <Th label="Acompañantes" k="acompanantes" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
@@ -223,7 +257,7 @@ export default function DashboardPage() {
               <tbody>
                 {pageRows.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center text-slate-400">
+                    <td colSpan={8} className="px-4 py-10 text-center text-slate-400">
                       No hay inscripciones que mostrar.
                     </td>
                   </tr>
@@ -232,6 +266,7 @@ export default function DashboardPage() {
                   <tr key={c.id} className="border-t border-slate-100 hover:bg-slate-50">
                     <td className="px-4 py-3 font-medium text-slate-900">{c.nombre_completo}</td>
                     <td className="px-4 py-3 text-slate-600">{c.cedula}</td>
+                    <td className="px-4 py-3 text-slate-600">{c.sede ?? "—"}</td>
                     <td className="px-4 py-3 text-slate-600">{nombreMes(c.ingreso_mes)} {c.ingreso_anio}</td>
                     <td className="px-4 py-3 text-slate-600">{c.antiguedad_meses} meses</td>
                     <td className="px-4 py-3 text-slate-600">{c.acompanantes?.length ?? 0}</td>
@@ -277,7 +312,14 @@ export default function DashboardPage() {
       </div>
 
       {/* Modal detalle */}
-      {detalle && <DetalleModal c={detalle} onClose={() => setDetalle(null)} />}
+      {detalle && (
+        <DetalleModal
+          c={detalle}
+          onClose={() => setDetalle(null)}
+          onDeleteColaborador={eliminarColaborador}
+          onDeleteAcompanante={eliminarAcompanante}
+        />
+      )}
     </main>
   );
 }
@@ -324,7 +366,14 @@ function Th({
   );
 }
 
-function DetalleModal({ c, onClose }: { c: Colaborador; onClose: () => void }) {
+function DetalleModal({
+  c, onClose, onDeleteColaborador, onDeleteAcompanante,
+}: {
+  c: Colaborador;
+  onClose: () => void;
+  onDeleteColaborador: (id: string) => void;
+  onDeleteAcompanante: (colaboradorId: string, acompananteId: string) => void;
+}) {
   return (
     <div className="fixed inset-0 z-20 grid place-items-center bg-slate-900/50 p-4" onClick={onClose}>
       <div
@@ -340,6 +389,8 @@ function DetalleModal({ c, onClose }: { c: Colaborador; onClose: () => void }) {
         </div>
 
         <dl className="grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-4 text-sm">
+          <Info label="Sede" value={c.sede ?? "—"} />
+          <Info label="Estado civil" value={labelEstadoCivil(c.estado_civil)} />
           <Info label="Fecha de ingreso" value={`${nombreMes(c.ingreso_mes)} ${c.ingreso_anio}`} />
           <Info label="Antigüedad" value={`${c.antiguedad_meses} meses`} />
           <Info label="Asistencia" value={c.asistencia === "solo" ? "Solo" : "Acompañado"} />
@@ -357,24 +408,45 @@ function DetalleModal({ c, onClose }: { c: Colaborador; onClose: () => void }) {
           <table className="w-full text-left text-sm">
             <thead className="text-xs uppercase text-slate-500">
               <tr>
-                <th className="py-2 font-semibold">Nombre</th>
+                <th className="py-2 font-semibold">Parentesco</th>
                 <th className="py-2 font-semibold">Edad</th>
                 <th className="py-2 font-semibold">Género</th>
+                <th className="py-2 font-semibold text-right">Acción</th>
               </tr>
             </thead>
             <tbody>
               {c.acompanantes.map((a) => (
                 <tr key={a.id} className="border-t border-slate-100">
-                  <td className="py-2 text-slate-800">{a.nombre_completo}</td>
+                  <td className="py-2 text-slate-800">{a.categoria ?? "—"}</td>
                   <td className="py-2 text-slate-600">{a.edad}</td>
                   <td className="py-2 text-slate-600">
                     {a.genero ? (a.genero === "masculino" ? "Masculino" : "Femenino") : "—"}
+                  </td>
+                  <td className="py-2 text-right">
+                    <button
+                      onClick={() => onDeleteAcompanante(c.id, a.id)}
+                      className="rounded-md px-2 py-1 text-xs font-medium text-red-500 hover:bg-red-50 hover:text-red-700"
+                    >
+                      Eliminar
+                    </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
+
+        <div className="mt-6 border-t border-slate-100 pt-4">
+          <button
+            onClick={() => onDeleteColaborador(c.id)}
+            className="w-full rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-100"
+          >
+            Eliminar colaborador
+          </button>
+          <p className="mt-2 text-center text-xs text-slate-400">
+            Elimina el registro completo junto con todos sus acompañantes.
+          </p>
+        </div>
       </div>
     </div>
   );

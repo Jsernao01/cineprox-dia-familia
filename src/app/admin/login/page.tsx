@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { Spinner } from "@/components/Spinner";
 
 function LoginForm() {
   const router = useRouter();
@@ -23,12 +24,12 @@ function LoginForm() {
         body: JSON.stringify({ user, password }),
       });
       const json = await res.json();
-      if (!res.ok) { setError(json.error || "No se pudo iniciar sesión."); return; }
+      if (!res.ok) { setError(json.error || "No se pudo iniciar sesión."); setLoading(false); return; }
+      // Mantenemos el spinner activo durante la redirección al panel.
       router.push(params.get("redirect") || "/admin/dashboard");
       router.refresh();
     } catch {
       setError("Error de conexión.");
-    } finally {
       setLoading(false);
     }
   }
@@ -58,8 +59,9 @@ function LoginForm() {
       <button
         type="submit"
         disabled={loading}
-        className="mt-5 w-full rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+        className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-70"
       >
+        {loading && <Spinner className="h-4 w-4" />}
         {loading ? "Ingresando…" : "Iniciar sesión"}
       </button>
     </form>
