@@ -24,8 +24,8 @@ function validar(body: any): { ok: true; data: InscripcionInput } | { ok: false;
 
   let acompanantes: any[] = Array.isArray(body.acompanantes) ? body.acompanantes : [];
   if (asistencia === "solo") acompanantes = [];
-  if (acompanantes.length > 4)
-    return { ok: false, error: "Máximo 4 acompañantes permitidos." };
+  if (acompanantes.length > 7)
+    return { ok: false, error: "Máximo 7 acompañantes permitidos." };
   if (asistencia === "acompanado" && acompanantes.length === 0)
     return { ok: false, error: "Debe registrar al menos un acompañante." };
 

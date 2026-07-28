@@ -7,11 +7,11 @@ import { calcularAntiguedadMeses, MESES } from "@/lib/utils";
 type Genero = "masculino" | "femenino" | "";
 interface Acomp {
   id: number;
-  nombre: string;
   edad: string;
   genero: Genero;
 }
 
+const MAX_ACOMP = 7;
 const ANIO_ACTUAL = new Date().getFullYear();
 const ANIOS = Array.from({ length: ANIO_ACTUAL - 1990 + 1 }, (_, i) => ANIO_ACTUAL - i);
 
@@ -23,6 +23,7 @@ export default function InscripcionPage() {
   const [mes, setMes] = useState("");
   const [anio, setAnio] = useState("");
   const [asistencia, setAsistencia] = useState<"" | "solo" | "acompanado">("");
+  const [cantidad, setCantidad] = useState("");
   const [acompanantes, setAcompanantes] = useState<Acomp[]>([]);
   const [error, setError] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -35,24 +36,32 @@ export default function InscripcionPage() {
 
   function reset() {
     setNombre(""); setCedula(""); setMes(""); setAnio("");
-    setAsistencia(""); setAcompanantes([]); setError("");
+    setAsistencia(""); setCantidad(""); setAcompanantes([]); setError("");
   }
 
-  function agregarAcompanante() {
-    if (acompanantes.length >= 4) return;
-    setAcompanantes((a) => [...a, { id: acompId++, nombre: "", edad: "", genero: "" }]);
-  }
-  function eliminarAcompanante(id: number) {
-    setAcompanantes((a) => a.filter((x) => x.id !== id));
-  }
   function actualizar(id: number, campo: keyof Acomp, valor: string) {
     setAcompanantes((a) => a.map((x) => (x.id === id ? { ...x, [campo]: valor } : x)));
   }
 
+  // Ajusta el número de tarjetas según la cantidad elegida (conserva lo ya escrito)
+  function elegirCantidad(valor: string) {
+    setCantidad(valor);
+    const n = Number(valor);
+    setAcompanantes((prev) => {
+      const next: Acomp[] = [];
+      for (let i = 0; i < n; i++) {
+        next.push(prev[i] ?? { id: acompId++, edad: "", genero: "" });
+      }
+      return next;
+    });
+  }
+
   function seleccionarAsistencia(v: "solo" | "acompanado") {
     setAsistencia(v);
-    if (v === "solo") setAcompanantes([]);
-    else if (acompanantes.length === 0) agregarAcompanante();
+    if (v === "solo") {
+      setCantidad("");
+      setAcompanantes([]);
+    }
   }
 
   function validarCliente(): string | null {
@@ -61,9 +70,10 @@ export default function InscripcionPage() {
     if (!mes || !anio) return "Seleccione el mes y año de ingreso.";
     if (!asistencia) return "Indique si asistirá solo o acompañado.";
     if (asistencia === "acompanado") {
-      if (acompanantes.length === 0) return "Agregue al menos un acompañante.";
+      if (!cantidad) return "Indique cuántos acompañantes registrará.";
+      if (acompanantes.length < 1 || acompanantes.length > MAX_ACOMP)
+        return `La cantidad de acompañantes debe estar entre 1 y ${MAX_ACOMP}.`;
       for (const a of acompanantes) {
-        if (!a.nombre.trim()) return "Todos los acompañantes deben tener nombre.";
         const e = Number(a.edad);
         if (a.edad === "" || Number.isNaN(e)) return "Ingrese la edad de cada acompañante.";
         if (e < 0) return "La edad no puede ser negativa.";
@@ -90,8 +100,8 @@ export default function InscripcionPage() {
         asistencia,
         acompanantes:
           asistencia === "acompanado"
-            ? acompanantes.map((a) => ({
-              nombre_completo: a.nombre.trim(),
+            ? acompanantes.map((a, idx) => ({
+              nombre_completo: `Acompañante ${idx + 1}`,
               edad: Number(a.edad),
               genero: Number(a.edad) <= 14 ? a.genero : null,
             }))
@@ -223,14 +233,32 @@ export default function InscripcionPage() {
                 desc="Registraré acompañantes"
               />
             </div>
+
+            {/* Cantidad de acompañantes */}
+            {asistencia === "acompanado" && (
+              <div className="mt-5">
+                <Field label={`¿Cuántos acompañantes? (máximo ${MAX_ACOMP})`}>
+                  <select
+                    value={cantidad}
+                    onChange={(e) => elegirCantidad(e.target.value)}
+                    className={inputCls}
+                  >
+                    <option value="">Seleccione</option>
+                    {Array.from({ length: MAX_ACOMP }, (_, i) => i + 1).map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+            )}
           </section>
 
           {/* Acompañantes */}
-          {asistencia === "acompanado" && (
+          {asistencia === "acompanado" && acompanantes.length > 0 && (
             <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
               <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-slate-900">Acompañantes</h2>
-                <span className="text-xs font-medium text-slate-500">{acompanantes.length}/4</span>
+                <h2 className="text-lg font-semibold text-slate-900">Datos de los acompañantes</h2>
+                <span className="text-xs font-medium text-slate-500">{acompanantes.length} en total</span>
               </div>
 
               <div className="space-y-4">
@@ -239,27 +267,12 @@ export default function InscripcionPage() {
                   const esMenor = a.edad !== "" && !Number.isNaN(edadNum) && edadNum <= 14;
                   return (
                     <div key={a.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="mb-3 flex items-center justify-between">
+                      <div className="mb-3">
                         <span className="text-sm font-semibold text-slate-700">
                           Acompañante {idx + 1}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => eliminarAcompanante(a.id)}
-                          className="text-xs font-medium text-red-500 hover:text-red-700"
-                        >
-                          Eliminar
-                        </button>
                       </div>
                       <div className="grid gap-3 sm:grid-cols-2">
-                        <Field label="Nombre completo">
-                          <input
-                            value={a.nombre}
-                            onChange={(e) => actualizar(a.id, "nombre", e.target.value)}
-                            className={inputCls}
-                            placeholder="Nombre y apellidos"
-                          />
-                        </Field>
                         <Field label="Edad">
                           <input
                             value={a.edad}
@@ -289,16 +302,6 @@ export default function InscripcionPage() {
                   );
                 })}
               </div>
-
-              {acompanantes.length < 4 && (
-                <button
-                  type="button"
-                  onClick={agregarAcompanante}
-                  className="mt-4 w-full rounded-lg border-2 border-dashed border-slate-300 py-3 text-sm font-medium text-slate-600 transition hover:border-brand-400 hover:text-brand-700"
-                >
-                  + Agregar acompañante
-                </button>
-              )}
             </section>
           )}
 
