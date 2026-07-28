@@ -78,7 +78,6 @@ export default function LoginPage() {
             className="mx-auto mb-4 h-11 w-auto"
           />
           <h1 className="text-xl font-bold text-slate-900">Panel administrativo</h1>
-          <p className="mt-1 text-sm text-slate-500">Día de la Familia CineProx</p>
         </div>
 
         <Suspense fallback={<div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-400 shadow-sm">Cargando…</div>}>

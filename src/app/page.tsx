@@ -66,9 +66,7 @@ export default function HomePage() {
         </Link>
       </section>
 
-      <footer className="pb-8 text-center text-xs text-slate-400">
-        © {new Date().getFullYear()} CineProx · Día de la Familia
-      </footer>
+
     </main>
   );
 }
