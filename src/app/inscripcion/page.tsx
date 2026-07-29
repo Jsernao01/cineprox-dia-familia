@@ -38,7 +38,7 @@ export default function InscripcionPage() {
   }, [mes, anio]);
 
   const soloUno = estadoCivil === "soltero_sin_hijos"; // límite exacto de 1
-  const pideParentesco = estadoCivil === "otro";
+  const pideParentesco = estadoCivil === "casado_union_libre";
 
   function reset() {
     setNombre(""); setCedula(""); setSede(""); setEstadoCivil("");
@@ -145,14 +145,26 @@ export default function InscripcionPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 py-8">
+    <main className="relative min-h-screen py-8">
+      {/* Fondo: degradado violeta de marca + imagen difuminada */}
+      <div
+        className="fixed inset-0 -z-20"
+        style={{ background: "radial-gradient(circle at 50% 25%, #3d0d70 0%, #24073f 45%, #120324 100%)" }}
+        aria-hidden
+      />
+      <div
+        className="fixed inset-0 -z-10 scale-125 bg-cover bg-center opacity-55 blur-2xl"
+        style={{ backgroundImage: "url('/fondo.jpg')" }}
+        aria-hidden
+      />
+
       <div className="mx-auto max-w-2xl px-4">
         <div className="mb-6 flex items-center justify-between">
-          <Link href="/" className="text-sm font-medium text-slate-500 hover:text-slate-800">
+          <Link href="/" className="text-sm font-medium text-white/80 hover:text-white">
             ← Volver
           </Link>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/cineprox-transparent.png" alt="CineProx" className="h-6 w-auto" />
+          <img src="/cineprox-white.png" alt="CineProx" className="h-6 w-auto" />
         </div>
 
         <form onSubmit={enviar} className="space-y-6">
@@ -259,7 +271,7 @@ export default function InscripcionPage() {
               <p className="mt-4 rounded-lg bg-brand-50 px-4 py-3 text-sm text-brand-700">
                 {estadoCivil === "soltero_con_hijos" && "Solo puede asistir con sus hijos como acompañantes."}
                 {estadoCivil === "soltero_sin_hijos" && "Puedes registrar a 1 acompañante."}
-                {estadoCivil === "otro" && "Por favor indique el parentesco para registrar a sus acompañantes."}
+                {estadoCivil === "casado_union_libre" && "Puede registrar a su cónyuge/compañero(a) sentimental e hijos. Indique el parentesco de cada uno."}
               </p>
             )}
           </section>

@@ -6,7 +6,7 @@ import type { InscripcionInput } from "@/lib/types";
 import { SEDES, PARENTESCOS } from "@/lib/constants";
 import { cookies } from "next/headers";
 
-const ESTADOS = ["soltero_con_hijos", "soltero_sin_hijos", "otro"] as const;
+const ESTADOS = ["soltero_con_hijos", "soltero_sin_hijos", "casado_union_libre"] as const;
 
 // ---------- Validación en servidor ----------
 function validar(body: any): { ok: true; data: InscripcionInput } | { ok: false; error: string } {
@@ -42,7 +42,7 @@ function validar(body: any): { ok: true; data: InscripcionInput } | { ok: false;
   const conCategoria = (a: any): string => {
     if (estadoCivil === "soltero_con_hijos") return "Hijo(a)";
     if (estadoCivil === "soltero_sin_hijos") return "Acompañante";
-    return String(a?.categoria ?? "").trim(); // otro
+    return String(a?.categoria ?? "").trim(); // casado / unión libre
   };
 
   const salida: InscripcionInput["acompanantes"] = [];
@@ -53,7 +53,7 @@ function validar(body: any): { ok: true; data: InscripcionInput } | { ok: false;
     if (edad <= 14 && a?.genero !== "masculino" && a?.genero !== "femenino")
       throw new ValidacionError("Indique el género de los menores de 14 años.");
     const categoria = conCategoria(a);
-    if (estadoCivil === "otro" && !PARENTESCOS.includes(categoria as any))
+    if (estadoCivil === "casado_union_libre" && !PARENTESCOS.includes(categoria as any))
       throw new ValidacionError("Seleccione el parentesco de cada acompañante.");
     salida.push({
       nombre_completo: `Acompañante ${i + 1}`,
