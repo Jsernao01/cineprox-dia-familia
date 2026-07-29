@@ -177,7 +177,7 @@ export default function DashboardPage() {
           <Kpi label="Colaboradores" value={stats.totalColaboradores} />
           <Kpi label="Acompañantes" value={stats.totalAcompanantes} />
           <Kpi label="Total asistentes" value={stats.totalAsistentes} accent />
-          <Kpi label="Menores de 14" value={stats.totalMenores} />
+          <Kpi label="Menores de 12" value={stats.totalMenores} />
           <Kpi label="Antigüedad prom." value={`${stats.promedioAntiguedad} m`} />
         </section>
 
@@ -202,7 +202,7 @@ export default function DashboardPage() {
             )}
           </Card>
 
-          <Card title="Género de menores de 14 años">
+          <Card title="Género de menores de 12 años">
             {stats.totalMenores === 0 ? (
               <EmptyChart />
             ) : (

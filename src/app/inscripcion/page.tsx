@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { calcularAntiguedadMeses, MESES } from "@/lib/utils";
-import { SEDES, ESTADOS_CIVILES, PARENTESCOS, type EstadoCivil } from "@/lib/constants";
+import { SEDES, ESTADOS_CIVILES, PARENTESCOS, PARENTESCO_CONYUGE, EDAD_MENOR, type EstadoCivil } from "@/lib/constants";
 import { alertaAdvertencia, alertaError, alertaExito } from "@/lib/alerts";
 import { Spinner } from "@/components/Spinner";
 
@@ -97,9 +97,11 @@ export default function InscripcionPage() {
         if (a.edad === "" || Number.isNaN(e)) return "Ingrese la edad de cada acompañante.";
         if (e < 0) return "La edad no puede ser negativa.";
         if (e > 120) return "La edad no puede superar 120 años.";
-        if (e <= 14 && !a.genero) return "Seleccione el género de los menores de 14 años.";
+        if (e <= EDAD_MENOR && !a.genero) return `Seleccione el género de los menores de ${EDAD_MENOR} años.`;
         if (pideParentesco && !a.categoria) return "Seleccione el parentesco de cada acompañante.";
       }
+      const conyuges = acompanantes.filter((a) => a.categoria === PARENTESCO_CONYUGE).length;
+      if (conyuges > 1) return "Solo puede registrar un cónyuge/compañero(a) permanente.";
     }
     return null;
   }
@@ -124,7 +126,7 @@ export default function InscripcionPage() {
             ? acompanantes.map((a) => ({
               categoria: pideParentesco ? a.categoria : "",
               edad: Number(a.edad),
-              genero: Number(a.edad) <= 14 ? a.genero : null,
+              genero: Number(a.edad) <= EDAD_MENOR ? a.genero : null,
             }))
             : [],
       };
@@ -271,7 +273,7 @@ export default function InscripcionPage() {
               <p className="mt-4 rounded-lg bg-brand-50 px-4 py-3 text-sm text-brand-700">
                 {estadoCivil === "soltero_con_hijos" && "Solo puede asistir con sus hijos como acompañantes."}
                 {estadoCivil === "soltero_sin_hijos" && "Puedes registrar a 1 acompañante."}
-                {estadoCivil === "casado_union_libre" && "Puede registrar a su cónyuge/compañero(a) sentimental e hijos. Indique el parentesco de cada uno."}
+                {estadoCivil === "casado_union_libre" && "Puede registrar a su cónyuge/compañero(a) permanente e hijos. Indique el parentesco de cada uno."}
               </p>
             )}
           </section>
@@ -289,7 +291,10 @@ export default function InscripcionPage() {
               <div className="space-y-4">
                 {acompanantes.map((a, idx) => {
                   const edadNum = Number(a.edad);
-                  const esMenor = a.edad !== "" && !Number.isNaN(edadNum) && edadNum <= 14;
+                  const esMenor = a.edad !== "" && !Number.isNaN(edadNum) && edadNum <= EDAD_MENOR;
+                  const conyugeTomadoPorOtro = acompanantes.some(
+                    (x) => x.id !== a.id && x.categoria === PARENTESCO_CONYUGE
+                  );
                   const titulo =
                     estadoCivil === "soltero_con_hijos" ? `Hijo(a) ${idx + 1}` : `Acompañante ${idx + 1}`;
                   return (
@@ -315,9 +320,14 @@ export default function InscripcionPage() {
                               className={inputCls}
                             >
                               <option value="">Seleccione</option>
-                              {PARENTESCOS.map((p) => (
-                                <option key={p} value={p}>{p}</option>
-                              ))}
+                              {PARENTESCOS.map((p) => {
+                                const bloqueado = p === PARENTESCO_CONYUGE && conyugeTomadoPorOtro;
+                                return (
+                                  <option key={p} value={p} disabled={bloqueado}>
+                                    {p}{bloqueado ? "" : ""}
+                                  </option>
+                                );
+                              })}
                             </select>
                           </Field>
                         )}

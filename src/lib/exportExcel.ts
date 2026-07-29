@@ -1,45 +1,40 @@
 import * as XLSX from "xlsx";
 import type { Colaborador } from "./types";
-import { nombreMes } from "./utils";
-import { labelEstadoCivil } from "./constants";
+import { EDAD_MENOR } from "./constants";
 
 export function exportarExcel(colaboradores: Colaborador[]) {
-  const rows: Record<string, string | number>[] = [];
-
-  for (const c of colaboradores) {
-    const base = {
-      Empleado: c.nombre_completo,
-      Cédula: c.cedula,
+  const rows = colaboradores.map((c) => {
+    const acomp = c.acompanantes ?? [];
+    const menores = acomp.filter((a) => a.edad <= EDAD_MENOR).length;
+    const mayores = acomp.filter((a) => a.edad > EDAD_MENOR).length;
+    const totalAcomp = acomp.length;
+    return {
+      "Nombre del colaborador": c.nombre_completo,
+      CC: c.cedula,
       Sede: c.sede ?? "",
-      "Estado civil": labelEstadoCivil(c.estado_civil),
-      "Fecha ingreso": `${nombreMes(c.ingreso_mes)} ${c.ingreso_anio}`,
-      "Antigüedad (meses)": c.antiguedad_meses,
       Asistencia: c.asistencia === "solo" ? "Solo" : "Acompañado",
+      [`Acompañantes menores (≤${EDAD_MENOR})`]: menores,
+      [`Acompañantes mayores (>${EDAD_MENOR})`]: mayores,
+      "Total de acompañantes": totalAcomp,
+      "Total de asistentes": totalAcomp + 1, // incluye al colaborador
     };
-
-    if (!c.acompanantes || c.acompanantes.length === 0) {
-      rows.push({ ...base, Parentesco: "", Edad: "", Género: "" });
-    } else {
-      for (const a of c.acompanantes) {
-        rows.push({
-          ...base,
-          Parentesco: a.categoria ?? "",
-          Edad: a.edad,
-          Género: a.genero ? (a.genero === "masculino" ? "Masculino" : "Femenino") : "",
-        });
-      }
-    }
-  }
-
-  const ws = XLSX.utils.json_to_sheet(rows, {
-    header: [
-      "Empleado", "Cédula", "Sede", "Estado civil", "Fecha ingreso",
-      "Antigüedad (meses)", "Asistencia", "Parentesco", "Edad", "Género",
-    ],
   });
+
+  const header = [
+    "Nombre del colaborador",
+    "CC",
+    "Sede",
+    "Asistencia",
+    `Acompañantes menores (≤${EDAD_MENOR})`,
+    `Acompañantes mayores (>${EDAD_MENOR})`,
+    "Total de acompañantes",
+    "Total de asistentes",
+  ];
+
+  const ws = XLSX.utils.json_to_sheet(rows, { header });
   ws["!cols"] = [
-    { wch: 28 }, { wch: 14 }, { wch: 40 }, { wch: 18 }, { wch: 16 },
-    { wch: 18 }, { wch: 12 }, { wch: 16 }, { wch: 8 }, { wch: 12 },
+    { wch: 30 }, { wch: 14 }, { wch: 40 }, { wch: 12 },
+    { wch: 22 }, { wch: 22 }, { wch: 20 }, { wch: 18 },
   ];
 
   const wb = XLSX.utils.book_new();

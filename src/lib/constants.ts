@@ -29,7 +29,13 @@ export function labelEstadoCivil(v?: string | null): string {
   return ESTADOS_CIVILES.find((e) => e.value === v)?.label ?? "—";
 }
 
+// Edad máxima (inclusive) para considerar a un acompañante como "menor"
+export const EDAD_MENOR = 12;
+
+// Parentesco de cónyuge (solo se puede seleccionar una vez por colaborador)
+export const PARENTESCO_CONYUGE = "Cónyuge/Compañero(a) permanente";
+
 export const PARENTESCOS = [
-  "Cónyuge/Compañero(a) sentimental",
-  "Hijo(a)",
+  PARENTESCO_CONYUGE,
+  "Hijo(a)/Hijastro(a)",
 ] as const;

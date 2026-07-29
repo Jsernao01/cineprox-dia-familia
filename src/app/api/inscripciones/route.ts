@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { calcularAntiguedadMeses } from "@/lib/utils";
 import { verificarSesion, AUTH_COOKIE } from "@/lib/auth";
 import type { InscripcionInput } from "@/lib/types";
-import { SEDES, PARENTESCOS } from "@/lib/constants";
+import { SEDES, PARENTESCOS, PARENTESCO_CONYUGE, EDAD_MENOR } from "@/lib/constants";
 import { cookies } from "next/headers";
 
 const ESTADOS = ["soltero_con_hijos", "soltero_sin_hijos", "casado_union_libre"] as const;
@@ -50,8 +50,8 @@ function validar(body: any): { ok: true; data: InscripcionInput } | { ok: false;
     const edad = Number(a?.edad);
     if (!Number.isFinite(edad) || edad < 0) throw new ValidacionError("La edad no puede ser negativa.");
     if (edad > 120) throw new ValidacionError("La edad no puede superar 120 años.");
-    if (edad <= 14 && a?.genero !== "masculino" && a?.genero !== "femenino")
-      throw new ValidacionError("Indique el género de los menores de 14 años.");
+    if (edad <= EDAD_MENOR && a?.genero !== "masculino" && a?.genero !== "femenino")
+      throw new ValidacionError(`Indique el género de los menores de ${EDAD_MENOR} años.`);
     const categoria = conCategoria(a);
     if (estadoCivil === "casado_union_libre" && !PARENTESCOS.includes(categoria as any))
       throw new ValidacionError("Seleccione el parentesco de cada acompañante.");
@@ -59,9 +59,13 @@ function validar(body: any): { ok: true; data: InscripcionInput } | { ok: false;
       nombre_completo: `Acompañante ${i + 1}`,
       categoria,
       edad,
-      genero: edad <= 14 ? (a.genero as any) : null,
+      genero: edad <= EDAD_MENOR ? (a.genero as any) : null,
     });
   });
+
+  // Solo se permite un cónyuge/compañero(a) permanente
+  if (salida.filter((a) => a.categoria === PARENTESCO_CONYUGE).length > 1)
+    throw new ValidacionError("Solo puede registrar un cónyuge/compañero(a) permanente.");
 
   return {
     ok: true,
