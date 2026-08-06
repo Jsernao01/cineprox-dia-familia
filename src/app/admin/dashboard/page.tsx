@@ -31,15 +31,24 @@ export default function DashboardPage() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const [detalle, setDetalle] = useState<Colaborador | null>(null);
+  const [abiertas, setAbiertas] = useState<boolean | null>(null);
+  const [cambiandoEstado, setCambiandoEstado] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/inscripciones");
-        if (res.status === 401) { router.push("/admin/login"); return; }
-        const json = await res.json();
-        if (!res.ok) { setErrorMsg(json.error || "Error al cargar."); return; }
+        const [resIns, resCfg] = await Promise.all([
+          fetch("/api/inscripciones"),
+          fetch("/api/config"),
+        ]);
+        if (resIns.status === 401) { router.push("/admin/login"); return; }
+        const json = await resIns.json();
+        if (!resIns.ok) { setErrorMsg(json.error || "Error al cargar."); return; }
         setData(json.data || []);
+        if (resCfg.ok) {
+          const cfg = await resCfg.json();
+          setAbiertas(cfg.abiertas !== false);
+        }
       } catch {
         setErrorMsg("Error de conexión.");
       } finally {
@@ -47,6 +56,33 @@ export default function DashboardPage() {
       }
     })();
   }, [router]);
+
+  async function cambiarEstadoInscripciones() {
+    const cerrar = abiertas !== false;
+    const ok = await confirmarEliminar(
+      cerrar ? "¿Cerrar inscripciones?" : "¿Reabrir inscripciones?",
+      cerrar
+        ? "Nadie podrá registrarse y en la pantalla de inicio aparecerá el aviso de cierre."
+        : "Se habilitará de nuevo el formulario público de inscripción."
+    );
+    if (!ok) return;
+    setCambiandoEstado(true);
+    try {
+      const res = await fetch("/api/config", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ abiertas: !cerrar }),
+      });
+      if (!res.ok) { alertaError("No se pudo cambiar el estado."); return; }
+      const json = await res.json();
+      setAbiertas(json.abiertas !== false);
+      toastExito(json.abiertas ? "Inscripciones abiertas" : "Inscripciones cerradas");
+    } catch {
+      alertaError("Error de conexión.");
+    } finally {
+      setCambiandoEstado(false);
+    }
+  }
 
   const stats = useMemo(() => calcularStats(data), [data]);
 
@@ -149,6 +185,17 @@ export default function DashboardPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {abiertas !== null && (
+              <button
+                onClick={cambiarEstadoInscripciones}
+                disabled={cambiandoEstado}
+                className={`rounded-lg px-3 py-2 text-sm font-semibold text-white transition disabled:opacity-60 ${
+                  abiertas ? "bg-red-600 hover:bg-red-700" : "bg-brand-600 hover:bg-brand-700"
+                }`}
+              >
+                {abiertas ? "Cerrar inscripciones" : "Abrir inscripciones"}
+              </button>
+            )}
             <button
               onClick={() => exportarExcel(data)}
               className="rounded-lg bg-green-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-green-700"

@@ -36,6 +36,18 @@ create index if not exists idx_acompanantes_colaborador
 --   alter table public.colaboradores add column if not exists sede         text;
 --   alter table public.acompanantes  add column if not exists categoria    text;
 
+
+-- Configuración global (abrir/cerrar inscripciones)
+create table if not exists public.configuracion (
+  id                      int  primary key default 1,
+  inscripciones_abiertas  boolean not null default true,
+  updated_at              timestamptz not null default now(),
+  constraint config_una_fila check (id = 1)
+);
+insert into public.configuracion (id, inscripciones_abiertas)
+  values (1, true) on conflict (id) do nothing;
+
 -- Seguridad (RLS): todo el acceso pasa por el servidor (service_role).
 alter table public.colaboradores enable row level security;
 alter table public.acompanantes  enable row level security;
+alter table public.configuracion  enable row level security;

@@ -4,6 +4,7 @@ import { calcularAntiguedadMeses } from "@/lib/utils";
 import { verificarSesion, AUTH_COOKIE } from "@/lib/auth";
 import type { InscripcionInput } from "@/lib/types";
 import { SEDES, PARENTESCOS, PARENTESCO_CONYUGE, EDAD_MENOR } from "@/lib/constants";
+import { getInscripcionesAbiertas } from "@/lib/config";
 import { cookies } from "next/headers";
 
 const ESTADOS = ["soltero_con_hijos", "soltero_sin_hijos", "casado_union_libre"] as const;
@@ -85,6 +86,12 @@ function validar(body: any): { ok: true; data: InscripcionInput } | { ok: false;
 class ValidacionError extends Error { }
 
 export async function POST(req: Request) {
+  if (!(await getInscripcionesAbiertas())) {
+    return NextResponse.json(
+      { error: "Las inscripciones para el Día de la Familia han sido cerradas." },
+      { status: 403 }
+    );
+  }
   const body = await req.json().catch(() => null);
   let parsed;
   try {
