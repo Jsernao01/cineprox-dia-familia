@@ -11,7 +11,7 @@ import { calcularStats } from "@/lib/stats";
 import { exportarExcel } from "@/lib/exportExcel";
 import { formatearFecha, nombreMes } from "@/lib/utils";
 import { labelEstadoCivil } from "@/lib/constants";
-import { confirmarEliminar, alertaError, toastExito } from "@/lib/alerts";
+import { confirmarEliminar, confirmarAccion, alertaError, toastExito } from "@/lib/alerts";
 import { Spinner } from "@/components/Spinner";
 
 type SortKey = "nombre_completo" | "cedula" | "antiguedad_meses" | "acompanantes" | "created_at";
@@ -38,8 +38,8 @@ export default function DashboardPage() {
     (async () => {
       try {
         const [resIns, resCfg] = await Promise.all([
-          fetch("/api/inscripciones"),
-          fetch("/api/config"),
+          fetch("/api/inscripciones", { cache: "no-store" }),
+          fetch("/api/config", { cache: "no-store" }),
         ]);
         if (resIns.status === 401) { router.push("/admin/login"); return; }
         const json = await resIns.json();
@@ -59,11 +59,13 @@ export default function DashboardPage() {
 
   async function cambiarEstadoInscripciones() {
     const cerrar = abiertas !== false;
-    const ok = await confirmarEliminar(
+    const ok = await confirmarAccion(
       cerrar ? "¿Cerrar inscripciones?" : "¿Reabrir inscripciones?",
       cerrar
         ? "Nadie podrá registrarse y en la pantalla de inicio aparecerá el aviso de cierre."
-        : "Se habilitará de nuevo el formulario público de inscripción."
+        : "Se habilitará de nuevo el formulario público de inscripción.",
+      cerrar ? "Sí, cerrar" : "Sí, reabrir",
+      cerrar
     );
     if (!ok) return;
     setCambiandoEstado(true);
@@ -71,6 +73,7 @@ export default function DashboardPage() {
       const res = await fetch("/api/config", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
+        cache: "no-store",
         body: JSON.stringify({ abiertas: !cerrar }),
       });
       if (!res.ok) { alertaError("No se pudo cambiar el estado."); return; }

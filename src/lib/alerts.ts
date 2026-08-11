@@ -51,6 +51,27 @@ export async function confirmarEliminar(title: string, text: string): Promise<bo
   return res.isConfirmed;
 }
 
+// Confirmación genérica (acción no destructiva). Devuelve true si confirma.
+export async function confirmarAccion(
+  title: string,
+  text: string,
+  confirmText: string,
+  peligroso = false
+): Promise<boolean> {
+  const res = await Swal.fire({
+    icon: "question",
+    title,
+    text,
+    showCancelButton: true,
+    confirmButtonText: confirmText,
+    cancelButtonText: "Cancelar",
+    confirmButtonColor: peligroso ? ROJO : BRAND,
+    cancelButtonColor: GRIS,
+    reverseButtons: true,
+  });
+  return res.isConfirmed;
+}
+
 // Notificación pequeña tipo toast (esquina superior).
 export function toastExito(title: string) {
   return Swal.fire({

@@ -1,8 +1,10 @@
+import { unstable_noStore as noStore } from "next/cache";
 import { getSupabaseAdmin } from "./supabaseAdmin";
 
 // Lee si las inscripciones están abiertas. Ante cualquier error, asume abiertas
 // (falla en modo "abierto" para no bloquear por un problema puntual de red).
 export async function getInscripcionesAbiertas(): Promise<boolean> {
+  noStore(); // nunca cachear: siempre leer el estado actual de la base
   try {
     const sb = getSupabaseAdmin();
     const { data, error } = await sb
