@@ -11,7 +11,7 @@ import { calcularStats } from "@/lib/stats";
 import { exportarExcel } from "@/lib/exportExcel";
 import { formatearFecha, nombreMes } from "@/lib/utils";
 import { labelEstadoCivil } from "@/lib/constants";
-import { confirmarEliminar, confirmarAccion, alertaError, toastExito } from "@/lib/alerts";
+import { confirmarEliminar, confirmarAccion, confirmarConTexto, alertaError, toastExito } from "@/lib/alerts";
 import { Spinner } from "@/components/Spinner";
 
 type SortKey = "nombre_completo" | "cedula" | "antiguedad_meses" | "acompanantes" | "created_at";
@@ -56,6 +56,27 @@ export default function DashboardPage() {
       }
     })();
   }, [router]);
+
+  async function eliminarTodos() {
+    const total = data.length;
+    if (total === 0) { toastExito("No hay registros para eliminar"); return; }
+    const ok = await confirmarConTexto(
+      "Eliminar todos los registros",
+      `Se eliminarán <b>${total}</b> colaborador${total === 1 ? "" : "es"} con todos sus acompañantes.<br/>Esta acción <b>no se puede deshacer</b>.`,
+      "ELIMINAR"
+    );
+    if (!ok) return;
+    try {
+      const res = await fetch("/api/inscripciones", { method: "DELETE", cache: "no-store" });
+      if (!res.ok) { alertaError("No se pudieron eliminar los registros."); return; }
+      setData([]);
+      setDetalle(null);
+      setPage(1);
+      toastExito("Todos los registros fueron eliminados");
+    } catch {
+      alertaError("Error de conexión.");
+    }
+  }
 
   async function cambiarEstadoInscripciones() {
     const cerrar = abiertas !== false;
@@ -357,6 +378,25 @@ export default function DashboardPage() {
                 Siguiente
               </button>
             </div>
+          </div>
+        </section>
+
+        {/* Zona de peligro */}
+        <section className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-red-700">Zona de peligro</h3>
+              <p className="mt-0.5 text-xs text-red-600">
+                Elimina de forma permanente todas las inscripciones registradas. Útil para dejar el
+                formulario limpio antes de un nuevo periodo. No se puede deshacer.
+              </p>
+            </div>
+            <button
+              onClick={eliminarTodos}
+              className="shrink-0 rounded-lg border border-red-300 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-600 hover:text-white"
+            >
+              Eliminar todos los registros
+            </button>
           </div>
         </section>
       </div>

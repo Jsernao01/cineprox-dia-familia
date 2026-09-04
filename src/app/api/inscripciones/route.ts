@@ -166,3 +166,15 @@ export async function GET() {
   if (error) return NextResponse.json({ error: "Error al consultar." }, { status: 500 });
   return NextResponse.json({ data });
 }
+
+// DELETE protegido: elimina TODAS las inscripciones (acompañantes por cascada)
+export async function DELETE() {
+  const token = cookies().get(AUTH_COOKIE)?.value;
+  const session = await verificarSesion(token);
+  if (!session) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
+
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase.from("colaboradores").delete().not("id", "is", null);
+  if (error) return NextResponse.json({ error: "No se pudieron eliminar los registros." }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}

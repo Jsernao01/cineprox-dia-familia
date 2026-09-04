@@ -1,17 +1,7 @@
 export const SEDES = [
-  "Administrativo (Operaciones, Call Center, Mantenimiento, Oficina)",
-  "Aventura",
-  "Aves María",
   "Carnaval",
-  "Florida",
   "Guacarí",
-  "La Central",
-  "Las Américas",
-  "Mayorca",
-  "Monterrey",
-  "Parque Fabricato",
   "Plaza del Río",
-  "Puerta del Norte",
   "San Nicolás",
   "Viva la Ceja",
 ] as const;

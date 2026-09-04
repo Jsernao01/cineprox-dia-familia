@@ -72,6 +72,37 @@ export async function confirmarAccion(
   return res.isConfirmed;
 }
 
+// Confirmación reforzada: exige escribir una palabra exacta para continuar.
+export async function confirmarConTexto(
+  title: string,
+  html: string,
+  palabra: string
+): Promise<boolean> {
+  const res = await Swal.fire({
+    icon: "warning",
+    title,
+    html,
+    input: "text",
+    inputPlaceholder: `Escribe ${palabra}`,
+    inputAttributes: { autocapitalize: "off", autocorrect: "off", spellcheck: "false" },
+    showCancelButton: true,
+    confirmButtonText: "Eliminar todo",
+    cancelButtonText: "Cancelar",
+    confirmButtonColor: ROJO,
+    cancelButtonColor: GRIS,
+    reverseButtons: true,
+    focusCancel: true,
+    preConfirm: (val: string) => {
+      if (val !== palabra) {
+        Swal.showValidationMessage(`Escribe exactamente "${palabra}" para confirmar.`);
+        return false;
+      }
+      return true;
+    },
+  });
+  return res.isConfirmed && res.value === palabra;
+}
+
 // Notificación pequeña tipo toast (esquina superior).
 export function toastExito(title: string) {
   return Swal.fire({
