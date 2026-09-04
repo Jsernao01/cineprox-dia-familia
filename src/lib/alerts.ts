@@ -100,7 +100,8 @@ export async function confirmarConTexto(
       return true;
     },
   });
-  return res.isConfirmed && res.value === palabra;
+  // Con preConfirm, Swal solo resuelve como confirmado cuando la palabra es correcta.
+  return res.isConfirmed === true;
 }
 
 // Notificación pequeña tipo toast (esquina superior).
